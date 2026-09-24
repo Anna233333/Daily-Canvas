@@ -2,6 +2,8 @@
 
 Daily Canvas is a private, browser-based pointillist mood journal. Write one sentence, choose **Paint**, and the app turns that moment into one colored paint dot. Every entry in a month joins the same evolving pointillist composition while retaining its original date.
 
+**Live site:** <https://anna233333.github.io/Daily-Canvas/>
+
 ## Run it
 
 No build step or dependencies are required.
