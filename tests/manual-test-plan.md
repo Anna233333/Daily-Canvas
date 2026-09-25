@@ -33,20 +33,34 @@
 - “I feel burned out” maps to Tiredness.
 - “I feel bored” maps to Boredom rather than Neutral.
 - “There is nothing to do” maps to Boredom.
-- A sentence with equally strong keywords from two mood families falls back to Neutral.
+- “I feel happy and anxious” produces one yellow-violet gradient dot labeled “Joy + Anxiety,” not Neutral.
+- “I feel very happy, anxious, and tired” includes all three colors, with Joy receiving a larger share.
+- Equal-score moods remain equally represented in their gradient.
+- A sentence containing Neutral and another recognized mood omits Neutral from the mixture.
+- Explicit Neutral by itself remains Neutral.
 
 ## Personalization
 
 - Add “jealous” with a custom green; confirm it appears in the palette and legend.
 - Enter “I feel jealous”; confirm the new custom mood is suggested.
+- Enter a sentence containing “jealous” and a built-in mood; confirm the custom color participates in one mixed dot.
 - Refresh the page; confirm the custom mood and color remain available.
-- Change the color of a built-in mood; confirm its palette swatch, legend, and existing dots update.
+- Change the color of a built-in mood; confirm its palette swatch, legend, and its portion of existing mixed dots update.
 - Try to add an existing keyword; confirm the app prevents the duplicate.
+
+## Mixed-mood compatibility
+
+- While a mixed suggestion is visible, manually select one palette mood and paint; confirm the saved dot is solid and uses only the chosen mood.
+- Refresh after saving a mixed dot; confirm its colors, proportions, label, date, and position persist.
+- Edit the sentence for a mixed dot; confirm its saved colors, label, date, and position do not change.
+- Load an entry created by an earlier version without `moodComponents`; confirm it still renders as its original single-color dot.
+- Confirm the canvas dot, calendar preview, suggestion swatch, and moment-list swatch all use the same gradient.
 
 ## Accessibility and layout
 
 - Complete the write, color-select, paint, calendar, and remove flows using only a keyboard.
 - Confirm focus indicators remain visible.
 - Confirm each calendar date and paint dot has a useful screen-reader label.
+- Confirm mixed labels and dot descriptions name every component in strongest-first order.
 - Test at desktop, tablet, and narrow mobile widths.
 - Enable reduced motion and confirm dot and scroll animations are suppressed.

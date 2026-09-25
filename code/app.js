@@ -240,9 +240,18 @@ function updateMoodColor(key, color) {
   const normalizedColor = color.toUpperCase();
   moods[key].color = normalizedColor;
   paletteOverrides[key] = normalizedColor;
-  entries = entries.map((entry) =>
-    entry.selectedMood === key ? { ...entry, color: normalizedColor } : entry,
-  );
+  entries = entries.map((entry) => {
+    const moodComponents = Array.isArray(entry.moodComponents)
+      ? entry.moodComponents.map((component) =>
+          component.mood === key ? { ...component, color: normalizedColor } : component,
+        )
+      : entry.moodComponents;
+    return {
+      ...entry,
+      ...(entry.selectedMood === key ? { color: normalizedColor } : {}),
+      ...(moodComponents ? { moodComponents } : {}),
+    };
+  });
   saveMoodPreferences();
   saveEntries();
   rebuildMoodControls();
@@ -283,6 +292,14 @@ function handleSubmit(event) {
 
   const analysis = analyzeMood(text);
   const selectedMood = selectedMoodOverride || analysis.mood;
+  const moodComponents = selectedMoodOverride
+    ? [{
+        mood: selectedMoodOverride,
+        score: 1,
+        color: moods[selectedMoodOverride].color,
+        matchedTerms: analysis.components.find((component) => component.mood === selectedMoodOverride)?.matchedTerms || [],
+      }]
+    : analysis.components;
   const timestamp = new Date();
   const id = createId();
   entries.push({
@@ -294,6 +311,7 @@ function handleSubmit(event) {
     selectedMood,
     color: moods[selectedMood].color,
     matchedTerms: analysis.matchedTerms,
+    moodComponents,
     visualSeed: hashString(id),
   });
 
@@ -345,31 +363,106 @@ function analyzeMood(input) {
     });
   });
 
-  const highestScore = Math.max(...Object.values(scores));
-  const leaders = Object.keys(scores).filter((key) => scores[key] === highestScore);
-  const mood = highestScore === 0 || leaders.length > 1 ? "neutral" : leaders[0];
-  return { mood, matchedTerms: [...new Set(matches[mood])] };
+  const components = Object.keys(moods)
+    .filter((key) => key !== "neutral" && scores[key] > 0)
+    .map((key) => ({
+      mood: key,
+      score: scores[key],
+      color: moods[key].color,
+      matchedTerms: [...new Set(matches[key])],
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  if (!components.length) {
+    components.push({
+      mood: "neutral",
+      score: Math.max(scores.neutral, 1),
+      color: moods.neutral.color,
+      matchedTerms: [...new Set(matches.neutral)],
+    });
+  }
+
+  return {
+    mood: components[0].mood,
+    matchedTerms: [...new Set(components.flatMap((component) => component.matchedTerms))],
+    components,
+  };
 }
 
 function updateSuggestion() {
   const text = elements.input.value.trim();
-  const analysis = text ? analyzeMood(text) : { mood: "neutral", matchedTerms: [] };
-  const shownMood = selectedMoodOverride || analysis.mood;
-  const mood = moods[shownMood];
+  const analysis = analyzeMood(text);
+  const components = selectedMoodOverride
+    ? [{ mood: selectedMoodOverride, score: 1, color: moods[selectedMoodOverride].color, matchedTerms: [] }]
+    : analysis.components;
+  const label = getMoodLabel(components);
 
-  elements.suggestionSwatch.style.setProperty("--swatch", mood.color);
+  elements.suggestionSwatch.style.setProperty("--swatch", buildMoodFill(components));
   if (!text) {
     elements.suggestionText.textContent = "Your suggested color will appear here.";
   } else if (selectedMoodOverride) {
-    elements.suggestionText.textContent = `You chose ${mood.label.toLowerCase()}.`;
+    elements.suggestionText.textContent = `You chose ${label.toLowerCase()}.`;
   } else {
-    elements.suggestionText.textContent = `Suggested color: ${mood.label}.`;
+    elements.suggestionText.textContent = `${components.length > 1 ? "Suggested colors" : "Suggested color"}: ${label}.`;
   }
 
   document.querySelectorAll(".palette-option").forEach((button) => {
-    button.classList.toggle("is-selected", button.dataset.mood === shownMood);
-    button.setAttribute("aria-pressed", String(button.dataset.mood === shownMood));
+    const isSelected = selectedMoodOverride
+      ? button.dataset.mood === selectedMoodOverride
+      : components.length === 1 && button.dataset.mood === components[0].mood;
+    button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
   });
+}
+
+function getMoodComponents(entry) {
+  if (Array.isArray(entry.moodComponents) && entry.moodComponents.length) {
+    const validComponents = entry.moodComponents.filter((component) =>
+      component && component.mood && component.color && Number(component.score) > 0,
+    );
+    if (validComponents.length) return validComponents;
+  }
+
+  const mood = moods[entry.selectedMood] || moods.neutral;
+  return [{
+    mood: entry.selectedMood || "neutral",
+    score: 1,
+    color: entry.color || mood.color,
+    matchedTerms: Array.isArray(entry.matchedTerms) ? entry.matchedTerms : [],
+  }];
+}
+
+function getMoodLabel(components) {
+  return components
+    .map((component) => moods[component.mood]?.label || "Mood")
+    .join(" + ");
+}
+
+function buildMoodFill(components) {
+  if (components.length <= 1) return components[0]?.color || moods.neutral.color;
+
+  const minimumShare = Math.min(0.12, 1 / components.length);
+  const availableShare = Math.max(0, 1 - minimumShare * components.length);
+  const totalScore = components.reduce((total, component) => total + Number(component.score), 0) || 1;
+  const shares = components.map((component) =>
+    minimumShare + availableShare * (Number(component.score) / totalScore),
+  );
+
+  const stops = [];
+  let position = 0;
+  components.forEach((component, index) => {
+    const end = position + shares[index] * 100;
+    const transition = Math.min(5, shares[index] * 100 * 0.25);
+    const color = component.color;
+    if (index === 0) stops.push(`${color} 0%`);
+    stops.push(`${color} ${Math.max(position, end - transition).toFixed(2)}%`);
+    if (index < components.length - 1) {
+      stops.push(`${components[index + 1].color} ${Math.min(100, end + transition).toFixed(2)}%`);
+    }
+    position = end;
+  });
+  stops.push(`${components.at(-1).color} 100%`);
+  return `linear-gradient(135deg, ${stops.join(", ")})`;
 }
 
 function render() {
@@ -405,6 +498,8 @@ function renderCanvas() {
   const positions = [];
   monthEntries.forEach((entry, index) => {
     const visual = makeVisual(entry, positions, index);
+    const moodComponents = getMoodComponents(entry);
+    const moodLabel = getMoodLabel(moodComponents);
     positions.push(visual);
     const dot = document.createElement("button");
     dot.className = "paint-dot";
@@ -414,11 +509,11 @@ function renderCanvas() {
     dot.style.top = `${visual.y}%`;
     dot.style.setProperty("--dot-size", `${visual.size}px`);
     dot.style.setProperty("--dot-rotation", `${visual.rotation}deg`);
-    dot.style.setProperty("--dot-color", entry.color);
+    dot.style.setProperty("--dot-color", buildMoodFill(moodComponents));
     dot.style.animationDelay = `${Math.min(index * 25, 250)}ms`;
     dot.setAttribute(
       "aria-label",
-      `${moods[entry.selectedMood]?.label || "Mood"} entry on ${formatEntryDate(entry.localDate)}: ${entry.text}`,
+      `${moodComponents.length > 1 ? "Mixed " : ""}${moodLabel} entry on ${formatEntryDate(entry.localDate)}: ${entry.text}`,
     );
     dot.addEventListener("click", () => focusMoment(entry.id));
     elements.dotsLayer.append(dot);
@@ -466,14 +561,15 @@ function renderMoments() {
     const cancelEdit = fragment.querySelector(".inline-cancel-button");
     const edit = fragment.querySelector(".edit-button");
     const remove = fragment.querySelector(".delete-button");
-    const mood = moods[entry.selectedMood] || moods.neutral;
+    const moodComponents = getMoodComponents(entry);
+    const moodLabel = getMoodLabel(moodComponents);
 
     card.dataset.entryId = entry.id;
-    dot.style.setProperty("--swatch", entry.color || mood.color);
-    dot.setAttribute("aria-label", `Show ${mood.label.toLowerCase()} dot on canvas`);
+    dot.style.setProperty("--swatch", buildMoodFill(moodComponents));
+    dot.setAttribute("aria-label", `Show ${moodLabel.toLowerCase()} dot on canvas`);
     dot.addEventListener("click", () => focusDot(entry.id));
     text.textContent = entry.text;
-    meta.textContent = `${mood.label} · ${formatEntryDate(entry.localDate, true)} · ${formatTime(entry.createdAt)}`;
+    meta.textContent = `${moodLabel} · ${formatEntryDate(entry.localDate, true)} · ${formatTime(entry.createdAt)}`;
     edit.setAttribute("aria-label", `Edit entry: ${entry.text}`);
     edit.addEventListener("click", () => startInlineEditing(card, editInput, entry));
     editForm.addEventListener("submit", (event) => {
@@ -520,7 +616,7 @@ function renderCalendar() {
       miniDots.className = "mini-dots";
       dayEntries.slice(0, 4).forEach((entry) => {
         const dot = document.createElement("i");
-        dot.style.setProperty("--mini-color", entry.color);
+        dot.style.setProperty("--mini-color", buildMoodFill(getMoodComponents(entry)));
         miniDots.append(dot);
       });
       button.append(miniDots);

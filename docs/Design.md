@@ -30,7 +30,7 @@ When the person selects **Paint**:
 
 1. Trim and validate the sentence.
 2. Analyze its emotion keywords.
-3. Choose the corresponding mood family and color.
+3. Collect every recognized non-neutral mood and its score. Use one color for one mood, or make a soft score-weighted gradient for several moods.
 4. Save the original sentence, result, and timestamp.
 5. Animate one dot onto the displayed month's shared canvas, dated to the selected calendar day.
 6. Clear the input and show a brief confirmation such as **“A moment added.”**
@@ -73,6 +73,8 @@ Dot variation should be generated from the entry ID so the painting looks the sa
 
 Colors should be distinguishable in common forms of color-vision deficiency. Text labels and entry details provide a non-color-only interpretation.
 
+When a sentence contains two or more recognized non-neutral moods, all of their colors appear in one soft gradient. Scores determine the approximate share of the dot, with a minimum visible share reserved for every component. Neutral is omitted from a mixture and remains the fallback only when no non-neutral mood is recognized. Built-in moods, Boredom, and user-created custom moods use the same rules.
+
 ## Keyword analysis
 
 The MVP can use a transparent, deterministic keyword scorer rather than an external AI service.
@@ -85,22 +87,25 @@ The MVP can use a transparent, deterministic keyword scorer rather than an exter
 4. Detect simple negation within the three words before a match, such as “not happy.”
 5. Add a score for each matched mood family.
 6. Give emphasis words such as “very,” “really,” and “extremely” a small weight boost.
-7. Select the family with the highest score.
-8. If there is no match or the top scores tie, use **Neutral** and allow the person to adjust the color.
+7. Sort all matched non-neutral families by score, strongest first.
+8. If one family matches, use its solid color. If several match, normalize their scores into gradient shares and reserve a minimum visible share for each family.
+9. If no non-neutral family matches, use **Neutral** and allow the person to adjust the color.
 
 Example:
 
 > “I am feeling down and a little lonely today.”
 
-“Down” and “lonely” both score for Sadness, so the app paints a deep blue dot.
+“Down” and “lonely” both score for Sadness, so the app paints a deep blue dot. “I feel very happy, anxious, and tired” creates one yellow-violet-slate gradient; the intensified Joy component receives more space.
 
 ### Important behavior
 
 - Phrase matching takes priority: “burned out” maps to Tiredness before “out” is ignored.
 - Negated emotion words do not count toward that family: “I am not sad” should not become Sadness solely because it contains “sad.”
-- Mixed sentences select the strongest score but may show a subtle **Change color** action before or after saving.
-- The interface should say **“Suggested color”**, not **“Detected emotion.”**
-- The person can override the suggestion without changing their original words.
+- Mixed sentences include every recognized non-neutral mood, ordered strongest first, and display a label such as **“Joy + Anxiety + Tiredness.”**
+- The interface should say **“Suggested color”** or **“Suggested colors”**, not **“Detected emotion.”**
+- Choosing a palette mood manually replaces the automatic mixture with one solid color without changing the original words.
+- Editing a saved sentence does not recalculate its paint, date, or position.
+- Recoloring a palette mood updates that component inside existing mixed dots.
 
 ## Dot placement
 
@@ -138,16 +143,22 @@ interface MoodEntry {
   selectedMood: MoodFamily;
   color: string;
   matchedTerms: string[];
+  moodComponents?: Array<{
+    mood: MoodFamily;
+    score: number;
+    color: string;
+    matchedTerms: string[];
+  }>;
   visualSeed: number;
 }
 ```
 
-Store entries locally for the MVP. Provide export and permanent-delete controls before adding accounts or synchronization.
+`moodComponents` is optional so entries saved by earlier versions remain valid single-color dots. Store entries locally for the MVP. Provide export and permanent-delete controls before adding accounts or synchronization.
 
 ## Accessibility and care
 
 - The input, button, calendar, dots, and entry list must be keyboard accessible.
-- Each dot needs an accessible label such as “Sadness entry, September 22 at 3:10 PM.”
+- Each dot needs an accessible label such as “Sadness entry, September 22 at 3:10 PM” or “Mixed Joy + Anxiety entry.”
 - Offer reduced motion and a high-contrast mode.
 - Do not rely on color alone; expose the mood name in details and screen-reader labels.
 - Avoid streaks, scores, warnings, or language that judges a person's emotional pattern.
@@ -159,6 +170,7 @@ Store entries locally for the MVP. Provide export and permanent-delete controls 
 
 - Write one sentence and create one dot.
 - Keyword-based mood suggestion with the nine color families above.
+- Score-weighted multicolor dots for sentences containing several recognized moods.
 - Manual color override.
 - Daily canvas and month calendar.
 - Entry detail list with edit and delete.
@@ -172,12 +184,13 @@ Store entries locally for the MVP. Provide export and permanent-delete controls 
 - Sharing or social features.
 - AI-generated interpretations or advice.
 - Trends, statistics, and sentiment scores.
-- Custom palettes, reminders, and image export.
+- Reminders and image export.
 
 ## Success criteria
 
 - Selecting **Paint** for a valid sentence produces exactly one persisted dot.
 - “I am feeling down” produces a blue Sadness suggestion.
+- “I feel happy and anxious” produces one yellow-violet gradient dot rather than Neutral.
 - A saved dot survives refresh with the same appearance and position.
 - Multiple entries on one day remain individually selectable.
 - A person can correct an inaccurate suggestion in one action.
@@ -188,4 +201,3 @@ Store entries locally for the MVP. Provide export and permanent-delete controls 
 - Should the sentence list be visible by default, or remain hidden to keep the canvas contemplative?
 - Should past dates accept new entries, or should entries always use their actual creation time?
 - Should manual palette customization preserve mood labels or replace the mood system entirely?
-- When a sentence strongly expresses two moods, should the dot stay a single blended mark or always use one primary color?
