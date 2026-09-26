@@ -53,6 +53,24 @@ Daily Canvas/
 
 Neutral is used only when no non-neutral feeling is recognized. Mixed labels such as **Joy + Anxiety + Tiredness** remain visible in the moment list and accessible dot descriptions, so color is never the only signal. Editing an entry's words preserves its original paint, date, and position.
 
+## AI Tools and Key Prompts
+
+**Tools Used:** OpenAI Codex
+
+Detailed learning notes and development decisions are documented in [`docs/learning-notes.md`](docs/learning-notes.md). Feature checks and testing iterations are recorded in [`tests/manual-test-plan.md`](tests/manual-test-plan.md).
+
+**Some of the prompts that shaped Daily Canvas include:**
+
+- “Can everything for the month be on the same canvas so it can generate a pointillist image, like a puzzle?”
+- “I just want to add the Edit option next to Remove without changing the paint.”
+- “Could the user undo a removal for three seconds?”
+- “Whenever I input ‘bored,’ the feeling becomes Neutral—but bored isn’t neutral.”
+- “Could you add the option to add your own word and choose your own color palette?”
+- “Can you mix the colors when more than two feelings are mentioned together?”
+- “If I input a lot of sentences, will the dots eventually overlap?”
+
+These prompts led to major decisions such as the shared monthly canvas, stable dot placement, editable journal text that preserves its artwork, three-second Undo, a distinct Boredom category, custom mood vocabulary, personalized palettes, and multicolor gradient dots.
+
 ## Reflections
 
 Inspired by my teaching experience, I wanted to build a mood journal that tracks my mood throughout the day and translates words into impressionist artwork. Hence, my core interaction was to “Build a pointillist mood canvas for anyone who wants to visually track their daily feelings. When someone types an emotion sentence and clicks ‘Paint,’ it should place a single corresponding impressionist-style colored dot onto a canvas/calendar to represent that emotion (one sentence entry = one dot). Could you also use simple keyword analysis to map emotions to corresponding mood colors (e.g., I am feeling down may be a blue dot)?” 
